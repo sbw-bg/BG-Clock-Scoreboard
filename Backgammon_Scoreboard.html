@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Backgammon Scoreboard</title>
+<style>
+:root {--bg:#f3f1ec; --card:#ffffff; --fg:#1d1d1f; --mute:#6e6e73; --acc:#b5452a; --line:#d8d5cd; --ok:#2f7d4f; color-scheme:light;}
+@media (prefers-color-scheme: dark) {
+  :root {--bg:#161616; --card:#232323; --fg:#ececec; --mute:#9a9a9f; --acc:#e0795c; --line:#3a3a3a; --ok:#5ec085; color-scheme:dark;}
+}
+* {box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html, body {margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; touch-action:manipulation; -webkit-user-select:none; user-select:none; overflow:hidden;}
+button, select, input {font-family:inherit; font-size:15px; color:var(--fg);}
+input {-webkit-user-select:text; user-select:text;}
+.app {height:100%; display:flex; flex-direction:column; gap:6px; padding:6px max(8px, env(safe-area-inset-right, 0px)) max(6px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); padding-top:max(6px, env(safe-area-inset-top, 0px));}
+
+/* Header */
+.top {display:flex; align-items:center; gap:6px; flex:0 0 auto; flex-wrap:nowrap;}
+.seg {display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; background:var(--card);}
+.seg button {border:0; background:transparent; padding:7px 12px; cursor:pointer;}
+.seg button.on {background:var(--acc); color:#fff;}
+select, .top > button {border:1px solid var(--line); border-radius:9px; background:var(--card); padding:7px 8px; cursor:pointer; font-weight:600;}
+.top > button {flex:1 1 0; min-width:0; white-space:nowrap;}
+.top > button.gear {flex:0 0 auto; padding:7px 10px;}
+.top > button:disabled {opacity:.35;}
+.top #cStart {background:var(--acc); color:#fff; border-color:var(--acc);}
+.top #cStart:disabled {background:var(--card); color:var(--fg); border-color:var(--line);}
+.top label {white-space:nowrap; font-size:14px; color:var(--mute); flex:0 0 auto;}
+.seg {flex:0 0 auto;}
+.mid {display:flex; align-items:center; justify-content:center; min-height:0;}
+.banner {width:100%; height:55%; display:flex; align-items:center; justify-content:center; text-align:center; padding:6px; border-radius:14px; font-weight:700; font-size:clamp(14px, 4.6vh, 26px); line-height:1.2; background:var(--card); border:2px solid var(--line); overflow:hidden;}
+.banner.crawford {background:var(--acc); color:#fff; border-color:var(--acc);}
+.banner.post {border-color:var(--acc); color:var(--acc);}
+.banner.win {background:var(--ok); color:#fff; border-color:var(--ok);}
+
+/* Main area: players left and right, controls in the middle */
+.main {flex:1; min-height:0; display:grid; grid-template-columns:1fr minmax(120px, 17%) 1fr; gap:8px;}
+.player {min-height:0; background:var(--card); border:2px solid var(--line); border-radius:16px; padding:6px 10px; display:flex; flex-direction:column; align-items:center; gap:2px;}
+.player.lead {border-color:var(--acc);}
+.player input {width:100%; text-align:center; font-size:16px; border:0; border-bottom:1px solid var(--line); background:transparent; padding:2px;}
+.score {width:100%; display:flex; align-items:center; justify-content:center; font-size:clamp(34px, 17vh, 90px); line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; cursor:pointer; border-radius:10px; background:var(--bg); padding:2px 0;}
+.sub {color:var(--mute); font-size:13px; min-height:1.2em;}
+.ct {flex:1; min-height:0; width:100%; border:0; border-radius:12px; background:var(--bg); color:var(--fg); padding:0 6px; cursor:pointer; opacity:.55; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.3em; font-variant-numeric:tabular-nums;}
+.ct .tm {font-size:min(30vh, 10vw); font-weight:700; line-height:1;}
+.ct .dl {font-size:clamp(13px, 6vh, 26px); font-weight:600; line-height:1; min-height:1em;}
+.ct.on {opacity:1; background:var(--acc); color:#fff;}
+.ct.flag {background:#b3261e; color:#fff; opacity:1;}
+.ct.low {animation:blink .8s steps(1, end) infinite;}
+@keyframes blink {0% {background:#000;} 50% {background:#b3261e;}}
+
+/* Dialog */
+.modal {position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:12px; z-index:50;}
+.modal[hidden] {display:none;}
+.modal .box {background:var(--card); border-radius:16px; padding:14px; max-width:380px; width:100%; display:flex; flex-direction:column; gap:12px; text-align:center;}
+.modal p {margin:0; font-size:16px;}
+.modal .btns {display:flex; gap:8px;}
+.modal .seg {align-self:stretch;}
+.modal .seg button {flex:1; padding:9px 12px;}
+#modal {z-index:60;}
+#editm .box {max-width:520px;}
+.modal .ed {display:flex; gap:16px; justify-content:center;}
+.edp {flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0;}
+.edn {font-size:14px; color:var(--mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
+.edt {display:flex; align-items:center; gap:4px;}
+.edc {display:flex; flex-direction:column; align-items:center; gap:4px;}
+.edc button {width:58px; height:40px; border-radius:10px; border:1px solid var(--line); background:var(--bg); font-size:18px; cursor:pointer; touch-action:manipulation; -webkit-touch-callout:none;}
+.edc span, .edt .colon {font-size:34px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.1;}
+.edc span {min-width:1.7em; text-align:center;}
+.modal .btns button {flex:1; padding:11px; border-radius:10px; border:1px solid var(--line); background:var(--card); cursor:pointer;}
+.modal .btns button.pri {background:var(--acc); color:#fff; border-color:var(--acc);}
+.modal label {display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left;}
+.modal .note {font-size:13px; color:var(--mute); text-align:left; min-height:1.2em;}
+.modal .tpp {white-space:nowrap;}
+.modal .tpp input {width:3.6em;}
+.modal input[type=number] {width:5em; padding:8px; border-radius:10px; border:1px solid var(--line); background:var(--card);}
+
+/* Portrait: players side by side, controls below */
+@media (orientation: portrait) {
+  html, body {overflow:auto;}
+  .app {height:auto; min-height:100%;}
+  .top {flex-wrap:wrap;}
+  .top > button {flex:1 1 30%;}
+  .banner {height:auto; padding:10px; font-size:18px;}
+  .main {grid-template-columns:1fr 1fr; grid-auto-rows:auto;}
+  .mid {grid-column:1 / 3; grid-row:2;}
+  .ct {min-height:130px;}
+  .ct .tm {font-size:clamp(44px, 16vw, 110px);}
+  .score {font-size:clamp(34px, 11vw, 70px);}
+}
+/* Very short landscape displays */
+@media (orientation: landscape) and (max-height: 380px) {
+  .seg button, select, .top > button {padding:5px 7px; font-size:13px;}
+  .top > button.gear {padding:5px 9px;}
+  .sub {font-size:12px;}
+}
+
+/* Lying phone: each player reads the time from their own side (player 1 turned 90° clockwise, player 2 counter-clockwise) */
+.ct {container-type:size; overflow:visible;}
+.ct .ci {display:flex; flex-direction:column; align-items:center; gap:.3em;}
+.lying #p0 .ct .ci {transform:rotate(90deg);}
+.lying #p1 .ct .ci {transform:rotate(-90deg);}
+/* Settings dialog: two columns in landscape, scrollable if needed */
+.modal .box {max-height:100%; overflow-y:auto;}
+.modal label {flex-wrap:wrap;}
+#setm .box {display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; max-width:640px;}
+#setm .box > p, #setm .box > .seg, #setm .box > .note, #setm .box > .btns {grid-column:1 / -1;}
+@media (orientation: portrait) { #setm .box {display:flex;} }
+/* Time and delay: delay sits on its own line below the time, 60% of the time's font size */
+.ct {--tmfs:min(45cqh, 32cqw);}
+.ct .tm {font-size:var(--tmfs);}
+.ct .dl {font-size:calc(var(--tmfs) * .6);}
+.ct .ci {gap:calc(var(--tmfs) * .3);}
+.lying .ct {--tmfs:min(27cqh, 45cqw);}
+@media (orientation: portrait) { .ct {min-height:190px;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <button id="reset">New match</button>
+    <button id="cStart">Start</button>
+    <button id="cEdit">Edit clock</button>
+    <button id="scEdit">Edit score</button>
+    <button class="gear" id="gear" aria-label="Settings">⚙</button>
+  </div>
+
+  <div class="main">
+    <div class="player" id="p0">
+      <input id="n0" maxlength="20" aria-label="Player 1 name">
+      <button class="ct" id="c0"><span class="ci"><span class="tm">0:00</span><span class="dl"></span></span></button>
+      <div class="score" id="s0">0</div>
+      <div class="sub" id="d0"></div>
+    </div>
+
+    <div class="mid"><div class="banner" id="banner"></div></div>
+
+    <div class="player" id="p1">
+      <input id="n1" maxlength="20" aria-label="Player 2 name">
+      <button class="ct" id="c1"><span class="ci"><span class="tm">0:00</span><span class="dl"></span></span></button>
+      <div class="score" id="s1">0</div>
+      <div class="sub" id="d1"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden><div class="box"><p id="mtext"></p><div class="btns"><button id="mno">Cancel</button><button class="pri" id="myes">OK</button></div></div></div>
+
+<div class="modal" id="scm" hidden><div class="box">
+  <p><b>Edit score</b></p>
+  <div class="ed" id="scBody"></div>
+  <div class="seg" id="scState">
+    <button data-st="0">Normal</button>
+    <button data-st="1">Crawford</button>
+    <button data-st="2">Post-Crawford</button>
+  </div>
+  <div class="btns"><button id="scNo">Cancel</button><button class="pri" id="scYes">OK</button></div>
+</div></div>
+
+<div class="modal" id="editm" hidden><div class="box">
+  <p><b>Edit clock</b></p>
+  <div class="ed" id="edBody"></div>
+  <div class="btns"><button id="edNo">Cancel</button><button class="pri" id="edYes">OK</button></div>
+</div></div>
+
+<div class="modal" id="setm" hidden><div class="box">
+  <p><b>Settings</b></p>
+  <div class="seg" id="modeSeg">
+    <button data-mode="match">Match</button>
+    <button data-mode="money">Money</button>
+  </div>
+  <label id="lenWrap">Match length <select id="matchTo"></select></label>
+  <label>Tilt to switch <select id="tilt"><option value="off">Off</option><option value="on">On</option><option value="inv">On (inverted)</option></select></label>
+  <label>Delay (seconds) <input id="delay" type="number" min="0" max="30" step="1"></label>
+  <label>Phone position <select id="pose"><option value="lying">Lying</option><option value="standing">Standing</option></select></label>
+  <label>Time per point <span class="tpp"><input id="tppM" type="number" min="0" max="10" step="1"> min <input id="tppS" type="number" min="0" max="59" step="1"> sec</span></label>
+  <label>Tilt angle (&deg;) <input id="tiltDeg" type="number" min="3" max="60" step="1"></label>
+  <div class="note" id="tiltNote"></div>
+  <div class="btns"><button class="pri" id="setClose">Done</button></div>
+</div></div>
+
+<script>
+(function() {
+  'use strict';
+  var $ = function(id) { return document.getElementById(id); };
+  var KEY = 'bg-scoreboard-v1';
+
+  var def = { mode: 'match', matchTo: 5, names: ['Player 1', 'Player 2'], score: [0, 0],
+              crawford: false, post: false, delay: 12, tilt: 'off', pose: 'lying', tiltDeg: 8 };
+  var s;
+  try { s = Object.assign({}, def, JSON.parse(localStorage.getItem(KEY))); } catch (e) { s = Object.assign({}, def); }
+
+  s.names = s.names.map(function(n, i) { return n === 'Spieler ' + (i + 1) ? 'Player ' + (i + 1) : n; });
+  // older versions stored minutes per point as a decimal
+  if (typeof s.secPP !== 'number') { s.secPP = Math.round((s.minPP || 2) * 60); }
+  // the default tilt angle changed from 12 to 8 degrees: move values that were never changed
+  if (!s.tiltDegV2) { if (s.tiltDeg === 12) { s.tiltDeg = 8; } s.tiltDegV2 = true; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+  function isMatch() { return s.mode === 'match'; }
+  function won() { return isMatch() && Math.max(s.score[0], s.score[1]) >= s.matchTo; }
+  function hasGame() { return s.score[0] + s.score[1] > 0; }
+  function name(i) { return (s.names[i] || '').trim() || 'Player ' + (i + 1); }
+  function ask(text, yes, no) {
+    $('mtext').textContent = text;
+    $('modal').hidden = false;
+    $('myes').onclick = function() { $('modal').hidden = true; yes(); };
+    $('mno').onclick = function() { $('modal').hidden = true; if (no) no(); };
+  }
+
+  // Match lengths: odd numbers only, 1 to 25
+  for (var m = 1; m <= 25; m += 2) { $('matchTo').add(new Option(m, m)); }
+
+  // ===== Clock =====
+  var clk = { t: [0, 0], turn: 0, running: false, delayLeft: 0, last: 0, timer: null, flag: -1 };
+  function totalSec() { return (isMatch() ? s.matchTo : 1) * s.secPP; }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function fmt(x) {
+    if (x < 60) {                       // under one minute: seconds:hundredths
+      var th = Math.max(0, Math.floor(x * 100));
+      return pad2(Math.floor(th / 100)) + ':' + pad2(th % 100);
+    }
+    x = Math.ceil(x);                   // otherwise: minutes:seconds
+    return Math.floor(x / 60) + ':' + pad2(x % 60);
+  }
+  function clockStop() { clearTimeout(clk.timer); clk.timer = null; clk.running = false; }
+  function loop() {
+    tick();
+    if (clk.running) { clk.timer = setTimeout(loop, clk.t[clk.turn] < 61 ? 30 : 100); }
+  }
+  function clockReset() {
+    clockStop();
+    clk.t = [totalSec(), totalSec()]; clk.turn = 0; clk.delayLeft = s.delay; clk.flag = -1;
+    renderClock();
+  }
+  function tick() {
+    var now = performance.now(), dt = (now - clk.last) / 1000;
+    clk.last = now;
+    if (clk.delayLeft > 0) {
+      if (dt <= clk.delayLeft) { clk.delayLeft -= dt; dt = 0; }
+      else { dt -= clk.delayLeft; clk.delayLeft = 0; }
+    }
+    if (dt > 0) {
+      clk.t[clk.turn] -= dt;
+      if (clk.t[clk.turn] <= 0) { clk.t[clk.turn] = 0; clk.flag = clk.turn; clockStop(); renderClock(); return; }
+    }
+    renderClock(true);
+  }
+  function clockToggle() {
+    if (clk.flag >= 0) return;
+    if (clk.running) { clockStop(); }
+    else { clk.running = true; clk.last = performance.now(); clk.timer = setTimeout(loop, 30); }
+    renderClock();
+  }
+  function clockTap(i) {
+    if (clk.flag >= 0) return;
+    if (!clk.running) { clk.turn = i; clk.delayLeft = s.delay; renderClock(); return; }
+    if (i !== clk.turn) return;
+    clk.turn = 1 - i; clk.delayLeft = s.delay; clk.last = performance.now();
+    renderClock();
+  }
+  function renderClock(light) {
+    [0, 1].forEach(function(i) {
+      var b = $('c' + i);
+      b.querySelector('.tm').textContent = fmt(clk.t[i]);
+      b.querySelector('.dl').textContent = clk.flag === i ? 'Time up'
+        : (clk.running && clk.turn === i && clk.delayLeft > 0) ? Math.ceil(clk.delayLeft) + ' s' : '';
+      b.classList.toggle('on', clk.turn === i && clk.flag < 0);
+      b.classList.toggle('flag', clk.flag === i);
+      b.classList.toggle('low', clk.running && clk.turn === i && clk.flag < 0 && clk.t[i] < 30);
+    });
+    if (light) { return; }
+    $('cStart').textContent = clk.running ? 'Pause' : (clk.t[0] < totalSec() || clk.t[1] < totalSec() ? 'Resume' : 'Start');
+    $('cStart').disabled = clk.flag >= 0;
+    $('tppM').value = Math.floor(s.secPP / 60); $('tppS').value = s.secPP % 60; $('delay').value = s.delay;
+  }
+
+  // ===== Score =====
+  function render() {
+    document.body.classList.toggle('lying', s.pose === 'lying');
+    var over = won();
+    $('modeSeg').querySelectorAll('button').forEach(function(b) { b.classList.toggle('on', b.dataset.mode === s.mode); });
+    $('matchTo').value = s.matchTo;
+    $('lenWrap').style.display = isMatch() ? '' : 'none';
+    $('n0').value = s.names[0]; $('n1').value = s.names[1];
+
+    var leader = s.score[0] === s.score[1] ? -1 : (s.score[0] > s.score[1] ? 0 : 1);
+    [0, 1].forEach(function(i) {
+      $('s' + i).textContent = s.score[i];
+      $('p' + i).classList.toggle('lead', leader === i);
+      var d;
+      if (isMatch()) { d = Math.max(0, s.matchTo - s.score[i]) + ' away'; }
+      else { var net = s.score[i] - s.score[1 - i]; d = 'Net ' + (net > 0 ? '+' : '') + net; }
+      $('d' + i).textContent = d;
+    });
+
+    var b = $('banner');
+    b.className = 'banner';
+    if (!isMatch()) { b.textContent = 'Money game'; }
+    else if (over) { b.textContent = name(s.score[0] > s.score[1] ? 0 : 1) + ' wins the match!'; b.classList.add('win'); }
+    else if (s.crawford) { b.textContent = 'Crawford game'; b.classList.add('crawford'); }
+    else if (s.post) { b.textContent = 'Post-Crawford'; b.classList.add('post'); }
+    else { b.textContent = 'Match to ' + s.matchTo; }
+
+    renderClock();
+    save();
+  }
+
+  function give(i, pts) {
+    if (won()) return;
+    var prevMax = Math.max(s.score[0], s.score[1]);
+    s.score[i] += pts;
+    if (isMatch()) {
+      if (s.crawford) { s.crawford = false; s.post = true; }
+      else if (!s.post && prevMax < s.matchTo - 1 && Math.max(s.score[0], s.score[1]) === s.matchTo - 1) { s.crawford = true; }
+    } else {
+      clockReset();   // Money game: fresh clock after every game
+    }
+    render();
+  }
+  function wipe() { s.score = [0, 0]; s.crawford = s.post = false; clockReset(); render(); }
+
+  // ===== Events =====
+  [0, 1].forEach(function(i) {
+    $('s' + i).addEventListener('click', function() { give(i, 1); });
+    $('c' + i).addEventListener('click', function() { clockTap(i); });
+    $('n' + i).addEventListener('input', function() { s.names[i] = this.value; save(); });
+    $('n' + i).addEventListener('change', render);
+  });
+  $('cStart').addEventListener('click', clockToggle);
+  $('reset').addEventListener('click', function() {
+    ask('Start a new match? The current score will be lost.', wipe);
+  });
+  $('modeSeg').addEventListener('click', function(e) {
+    var mo = e.target.dataset.mode;
+    if (!mo || mo === s.mode) return;
+    var apply = function() { s.mode = mo; wipe(); };
+    if (hasGame()) { ask('Switching mode resets the score. Continue?', apply); } else { apply(); }
+  });
+  $('matchTo').addEventListener('change', function() {
+    var v = Number(this.value), sel = this;
+    var apply = function() { s.matchTo = v; wipe(); };
+    if (hasGame()) { ask('Changing the match length resets the score. Continue?', apply, function() { sel.value = s.matchTo; }); } else { apply(); }
+  });
+  $('gear').addEventListener('click', function() { $('setm').hidden = false; });
+  $('setClose').addEventListener('click', function() { $('setm').hidden = true; });
+  var onTpp = function() {
+    var mi = parseInt($('tppM').value, 10), se = parseInt($('tppS').value, 10);
+    var v = (isNaN(mi) ? 0 : mi) * 60 + (isNaN(se) ? 0 : se);
+    if (v === 0 && isNaN(mi) && isNaN(se)) { v = 120; }
+    s.secPP = Math.min(600, Math.max(15, v));
+    clockReset(); save();
+  };
+  $('tppM').addEventListener('change', onTpp);
+  $('tppS').addEventListener('change', onTpp);
+  $('delay').addEventListener('change', function() {
+    var v = parseInt(this.value, 10);
+    s.delay = isNaN(v) ? 12 : Math.min(30, Math.max(0, v));
+    clockReset(); save();
+  });
+
+  // ===== Edit clock =====
+  var ed = [0, 0];
+  function edRender() {
+    [0, 1].forEach(function(i) {
+      $('en' + i).textContent = name(i);
+      $('em' + i).textContent = Math.floor(ed[i] / 60);
+      $('es' + i).textContent = pad2(ed[i] % 60);
+    });
+  }
+  function edStep(i, d) { ed[i] = Math.min(5999, Math.max(0, ed[i] + d)); edRender(); }
+  function mk(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
+  }
+  function arrow(i, d, sym, fn) {
+    fn = fn || edStep;
+    var b = mk('button', '', sym), t1, t2;
+    var stop = function() { clearTimeout(t1); clearInterval(t2); };
+    b.addEventListener('pointerdown', function(e) {
+      e.preventDefault();
+      fn(i, d); stop();
+      t1 = setTimeout(function() { t2 = setInterval(function() { fn(i, d); }, 70); }, 400);   // hold to repeat
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function(ev) { b.addEventListener(ev, stop); });
+    b.addEventListener('click', function(e) { if (e.detail === 0) { fn(i, d); } });           // keyboard
+    b.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    return b;
+  }
+  [0, 1].forEach(function(i) {
+    var col = mk('div', 'edp'), t = mk('div', 'edt');
+    var mc = mk('div', 'edc'), sc = mk('div', 'edc');
+    var em = mk('span', '', '0'), es = mk('span', '', '00');
+    em.id = 'em' + i; es.id = 'es' + i;
+    mc.appendChild(arrow(i, 60, '\u25B2')); mc.appendChild(em); mc.appendChild(arrow(i, -60, '\u25BC'));
+    sc.appendChild(arrow(i, 1, '\u25B2')); sc.appendChild(es); sc.appendChild(arrow(i, -1, '\u25BC'));
+    t.appendChild(mc); t.appendChild(mk('span', 'colon', ':')); t.appendChild(sc);
+    var n = mk('div', 'edn'); n.id = 'en' + i;
+    col.appendChild(n); col.appendChild(t);
+    $('edBody').appendChild(col);
+  });
+  $('cEdit').addEventListener('click', function() {
+    clockStop(); renderClock();
+    ed = [Math.ceil(clk.t[0]), Math.ceil(clk.t[1])];
+    edRender();
+    $('editm').hidden = false;
+  });
+  $('edNo').addEventListener('click', function() { $('editm').hidden = true; });
+  $('edYes').addEventListener('click', function() {
+    clk.t = [ed[0], ed[1]];
+    if (clk.flag >= 0 && clk.t[clk.flag] > 0) { clk.flag = -1; }
+    $('editm').hidden = true;
+    renderClock();
+  });
+
+  // ===== Edit score =====
+  var sc = [0, 0], scSt = 0;   // scSt: 0 normal, 1 Crawford game, 2 Post-Crawford
+  function scAuto() {
+    if (!isMatch()) { scSt = 0; return; }
+    var mx = Math.max(sc[0], sc[1]);
+    if (mx >= s.matchTo || mx < s.matchTo - 1) { scSt = 0; }
+    else if (scSt === 0) { scSt = 1; }   // someone is 1 away: next game is the Crawford game
+  }
+  function scRender() {
+    [0, 1].forEach(function(i) { $('sn' + i).textContent = name(i); $('sv' + i).textContent = sc[i]; });
+    var show = isMatch() && Math.max(sc[0], sc[1]) < s.matchTo && Math.max(sc[0], sc[1]) >= s.matchTo - 1;
+    $('scState').style.display = show ? '' : 'none';
+    $('scState').querySelectorAll('button').forEach(function(b) { b.classList.toggle('on', Number(b.dataset.st) === scSt); });
+  }
+  function scStep(i, d) { sc[i] = Math.min(99, Math.max(0, sc[i] + d)); scAuto(); scRender(); }
+  [0, 1].forEach(function(i) {
+    var col = mk('div', 'edp'), c = mk('div', 'edc');
+    var v = mk('span', '', '0'); v.id = 'sv' + i;
+    c.appendChild(arrow(i, 1, '\u25B2', scStep)); c.appendChild(v); c.appendChild(arrow(i, -1, '\u25BC', scStep));
+    var n = mk('div', 'edn'); n.id = 'sn' + i;
+    col.appendChild(n); col.appendChild(c);
+    $('scBody').appendChild(col);
+  });
+  $('scState').addEventListener('click', function(e) {
+    var st = e.target.dataset.st;
+    if (st === undefined) return;
+    scSt = Number(st); scRender();
+  });
+  $('scEdit').addEventListener('click', function() {
+    sc = s.score.slice();
+    scSt = s.crawford ? 1 : (s.post ? 2 : 0);
+    scRender();
+    $('scm').hidden = false;
+  });
+  $('scNo').addEventListener('click', function() { $('scm').hidden = true; });
+  $('scYes').addEventListener('click', function() {
+    s.score = sc.slice();
+    var open = isMatch() && Math.max(s.score[0], s.score[1]) < s.matchTo;
+    s.crawford = open && scSt === 1;
+    s.post = open && scSt === 2;
+    $('scm').hidden = true;
+    render();
+  });
+
+  // ===== Tilt to switch =====
+  // The player whose clock is running ends the turn by tilting the phone toward themselves
+  // (their side goes down), just like tapping the clock.
+  // Lying phone:    rotation around the screen's vertical axis (device x axis in landscape).
+  // Standing phone: rotation around the z axis, i.e. rolling the screen in its own plane.
+  var tiltAttached = false, tiltSeen = false, tiltLast = 0, tiltShown = 0;
+  var needsPermission = typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
+  var RAD = Math.PI / 180;
+
+  // Returns the tilt in degrees, positive = right side of the screen goes down
+  // (standing: clockwise as seen by the player), or null when the pose does not allow a reading.
+  function screenTilt(e) {
+    if (e.beta == null || e.gamma == null) return null;
+    var ang = (screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (window.orientation || 0);
+    ang = ((ang % 360) + 360) % 360;
+    var t;
+    if (s.pose === 'standing') {
+      // direction of "up" in device coordinates, from the orientation angles
+      var b = e.beta * RAD, g = e.gamma * RAD;
+      var ux = -Math.cos(b) * Math.sin(g), uy = Math.sin(b);
+      var su, sr;   // components of "up" along the screen's up and right directions
+      if (ang === 90) { su = ux; sr = -uy; }
+      else if (ang === 270) { su = -ux; sr = uy; }
+      else if (ang === 180) { su = -uy; sr = -ux; }
+      else { su = uy; sr = ux; }
+      if (Math.sqrt(su * su + sr * sr) < 0.5) { return null; }   // phone too flat to read a roll angle
+      t = Math.atan2(-sr, su) / RAD;
+    } else {
+      var other = (ang === 90 || ang === 270) ? e.gamma : e.beta;
+      if (Math.abs(other) > 70) { return null; }                 // phone too upright
+      if (ang === 90) { t = e.beta; }
+      else if (ang === 270) { t = -e.beta; }
+      else if (ang === 180) { t = -e.gamma; }
+      else { t = e.gamma; }
+    }
+    return Math.abs(t) > 80 ? null : t;
+  }
+  function onTilt(e) {
+    tiltSeen = true;
+    if (s.tilt === 'off') return;
+    var t = screenTilt(e);
+    if (t === null) return;
+    if (s.tilt === 'inv') { t = -t; }
+    var now = performance.now();
+    if (!$('setm').hidden && now - tiltShown > 150) {            // live value while the settings are open
+      tiltShown = now;
+      $('tiltNote').textContent = 'Current tilt: ' + Math.round(t) + '\u00B0';
+    }
+    if (!clk.running || clk.flag >= 0 || now - tiltLast < 500) return;
+    if ((clk.turn === 1 && t > s.tiltDeg) || (clk.turn === 0 && t < -s.tiltDeg)) {
+      tiltLast = now;
+      clockTap(clk.turn);
+      try { if (navigator.vibrate) { navigator.vibrate(30); } } catch (x) {}
+    }
+  }
+  function attachTilt() {
+    if (tiltAttached) return;
+    tiltAttached = true;
+    window.addEventListener('deviceorientation', onTilt);
+    setTimeout(function() {
+      if (!tiltSeen) { $('tiltNote').textContent = 'No motion sensor data. The sensor may be blocked, or this page needs HTTPS.'; }
+    }, 1500);
+  }
+  function enableTilt() {
+    $('tiltNote').textContent = '';
+    if (needsPermission) {
+      DeviceOrientationEvent.requestPermission().then(function(r) {
+        if (r === 'granted') { attachTilt(); }
+        else { $('tiltNote').textContent = 'Motion sensor permission was denied.'; }
+      }).catch(function() { $('tiltNote').textContent = 'Could not ask for motion sensor permission.'; });
+    } else {
+      attachTilt();
+    }
+  }
+  $('pose').value = s.pose;
+  $('tiltDeg').value = s.tiltDeg;
+  $('pose').addEventListener('change', function() { s.pose = this.value; save(); render(); });
+  $('tiltDeg').addEventListener('change', function() {
+    var v = parseInt(this.value, 10);
+    s.tiltDeg = isNaN(v) ? 8 : Math.min(60, Math.max(3, v));
+    this.value = s.tiltDeg; save();
+  });
+  $('tilt').value = s.tilt;
+  $('tilt').addEventListener('change', function() {
+    s.tilt = this.value; save();
+    if (s.tilt !== 'off') { enableTilt(); } else { $('tiltNote').textContent = ''; }
+  });
+  if (s.tilt !== 'off') {
+    if (!needsPermission) { attachTilt(); }
+    else { document.addEventListener('click', function once() { document.removeEventListener('click', once, true); enableTilt(); }, true); }   // iOS asks only after a tap
+  }
+
+  clockReset();
+  render();
+})();
+</script>
+</body>
+</html>
